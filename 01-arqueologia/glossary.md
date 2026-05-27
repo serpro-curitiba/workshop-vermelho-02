@@ -81,38 +81,35 @@ Prompt útil no Copilot Chat (cole o conteúdo de 2–3 arquivos `.NSN` no chat 
 | 38  | `COD-ACAO` (auditoria) | IN/AL/EX/CO/LG/LO/BT/ER/AU/RE | `AUDITORIA.ddm` `BA` | Inclusão/Alteração/Exclusão/Consulta/LoGin/LogOut/Batch/ERro/AUtorização/REjeição. |
 | 39  | `PERFIL` | ADM / OPR / CON / AUD / SUP | `AUDITORIA.ddm` `EC` | Administrador · Operador · Consulta · Auditor · Suporte. |
 | 40  | `GRP-` (prefixo) | Convenção de nomenclatura para grupos Adabas | todos os DDMs | Ex.: `GRP-DEPENDENTE`, `GRP-ENDERECO`, `GRP-DESCONTO`, `GRP-FAIXA-CALCULO`. |
-| 1   | CONSBENF | Consulta de Beneficiario | CONSBENF.NSN | Programa online (tela 3270) para consulta cadastral e historico de pagamentos do beneficiario. |
-| 2   | RELPGT | Relatorio de Pagamentos | RELPGT.NSN | Relatorio analitico por periodo com detalhamento, subtotal por programa e total geral. |
-| 3   | RELAUDIT | Relatorio de Auditoria | RELAUDIT.NSN | Emite trilha de auditoria com filtros por data, acao, usuario e tabela. |
-| 4   | BENEFICIARIO | Cadastro do beneficiario | CONSBENF.NSN, RELPGT.NSN | Entidade consultada por CPF/NIS para exibir dados pessoais e vinculo com pagamentos. |
-| 5   | PAGAMENTO | Registro de pagamento | CONSBENF.NSN, RELPGT.NSN | Entidade financeira com competencia, valores bruto/desconto/liquido, status e tipo. |
-| 6   | AUDITORIA | Evento auditavel do sistema | RELAUDIT.NSN | Registro historico de operacoes com usuario, acao, chave de referencia e descricao. |
-| 7   | CPF | Cadastro de Pessoa Fisica | CONSBENF.NSN, RELPGT.NSN | Identificador principal do beneficiario; exibicao aplica mascara para proteger dado sensivel. |
-| 8   | NIS | Numero de Identificacao Social | CONSBENF.NSN | Identificador alternativo para localizar beneficiario na consulta. |
-| 9   | COD-PROGRAMA | Codigo do programa social | CONSBENF.NSN, RELPGT.NSN | Classifica o beneficio/pagamento e suporta filtro e subtotal em relatorio. |
-| 10  | COMPETENCIA | Mes/ano de referencia | CONSBENF.NSN, RELPGT.NSN | Campo N6 usado para filtrar periodo e ordenar listagem de pagamentos. |
-| 11  | VLR-BRUTO | Valor bruto do pagamento | CONSBENF.NSN, RELPGT.NSN | Valor original do pagamento antes de descontos; participa de totais e subtotais. |
-| 12  | VLR-DESCONTO | Valor de desconto | CONSBENF.NSN, RELPGT.NSN | Deducoes aplicadas ao pagamento; acumulado no total geral do relatorio. |
-| 13  | VLR-LIQUIDO | Valor liquido do pagamento | CONSBENF.NSN, RELPGT.NSN | Valor final pago ao beneficiario apos descontos. |
-| 14  | VLR-ABONO | Valor de abono | RELPGT.NSN | Valor adicional acumulado separadamente no fechamento do relatorio. |
-| 15  | STATUS | Situacao cadastral do beneficiario | CONSBENF.NSN | Codigo do cadastro com descricao exibida: Ativo, Suspenso, Cancelado, Inativo, Desligado. |
-| 16  | STATUS-PGTO | Situacao do pagamento | CONSBENF.NSN, RELPGT.NSN | Codigo da etapa do pagamento (ex.: Gerado, Pago, Cancelado, Devolvido, Estornado). |
-| 17  | TIPO-PGTO | Tipo de pagamento | CONSBENF.NSN, RELPGT.NSN | Classifica natureza do pagamento (Normal, Decimo, Terceiro, Outro). |
-| 18  | DT-GERACAO | Data de geracao do pagamento | CONSBENF.NSN, RELPGT.NSN | Marca quando o registro de pagamento foi gerado no processamento. |
-| 19  | DT-CADASTRO | Data de cadastro | CONSBENF.NSN | Data de inclusao do beneficiario no cadastro SIFAP. |
-| 20  | RENDA-FAMILIAR | Renda familiar declarada | CONSBENF.NSN | Campo socioeconomico exibido na tela de consulta do beneficiario. |
-| 21  | NUM-DEPENDENTES | Quantidade de dependentes | CONSBENF.NSN | Indicador familiar usado no perfil cadastral do beneficiario. |
-| 22  | COD-REGIAO | Codigo da regiao administrativa | CONSBENF.NSN | Segmenta o beneficiario por regiao para fins cadastrais/operacionais. |
-| 23  | HISTORICO PAGAMENTOS | Extrato de ultimos pagamentos | CONSBENF.NSN | Lista os ultimos 12 pagamentos do beneficiario com competencia, valores, status e tipo. |
-| 24  | TRILHA AUDITORIA | Log rastreavel de eventos | RELAUDIT.NSN | Relatorio cronologico de eventos de sistema para controle e fiscalizacao. |
-| 25  | ACAO | Tipo de evento auditado | RELAUDIT.NSN | Codigos de negocio de auditoria: IN, AL, CO, CN, DV; EX e filtrado da exibicao. |
-| 26  | CONCILIACAO | Acao de conciliacao | RELAUDIT.NSN | Tipo de evento auditado contado separadamente no resumo de auditoria. |
-| 27  | DIVERGENCIA | Acao de divergencia | RELAUDIT.NSN | Evento de inconsistencia identificado e contabilizado no resumo. |
-| 28  | TABELA-REF | Tabela de referencia do evento | RELAUDIT.NSN | Nome da tabela/entidade afetada pela acao auditada. |
-| 29  | CHAVE-REF | Chave de referencia do evento | RELAUDIT.NSN | Identificador do registro afetado para rastreabilidade na auditoria. |
-| 30  | SUBTOTAL PROGRAMA | Total parcial por programa | RELPGT.NSN | Quebra de controle por COD-PROGRAMA com quantidade e somatorio bruto/liquido. |
+| 41  | CONSBENF | Consulta de Beneficiario | CONSBENF.NSN | Programa online (tela 3270) para consulta cadastral e historico de pagamentos do beneficiario. |
+| 42  | RELPGT | Relatorio de Pagamentos | RELPGT.NSN | Relatorio analitico por periodo com detalhamento, subtotal por programa e total geral. |
+| 43  | RELAUDIT | Relatorio de Auditoria | RELAUDIT.NSN | Emite trilha de auditoria com filtros por data, acao, usuario e tabela. |
+| 44  | BENEFICIARIO | Cadastro do beneficiario | CONSBENF.NSN, RELPGT.NSN | Entidade consultada por CPF/NIS para exibir dados pessoais e vinculo com pagamentos. |
+| 45  | PAGAMENTO | Registro de pagamento | CONSBENF.NSN, RELPGT.NSN | Entidade financeira com competencia, valores bruto/desconto/liquido, status e tipo. |
+| 46  | AUDITORIA | Evento auditavel do sistema | RELAUDIT.NSN | Registro historico de operacoes com usuario, acao, chave de referencia e descricao. |
+| 47  | NIS | Numero de Identificacao Social | CONSBENF.NSN | Identificador alternativo para localizar beneficiario na consulta. |
+| 48  | COD-PROGRAMA | Codigo do programa social | CONSBENF.NSN, RELPGT.NSN | Classifica o beneficio/pagamento e suporta filtro e subtotal em relatorio. |
+| 49  | VLR-BRUTO | Valor bruto do pagamento | CONSBENF.NSN, RELPGT.NSN | Valor original do pagamento antes de descontos; participa de totais e subtotais. |
+| 50  | VLR-DESCONTO | Valor de desconto | CONSBENF.NSN, RELPGT.NSN | Deducoes aplicadas ao pagamento; acumulado no total geral do relatorio. |
+| 51  | VLR-LIQUIDO | Valor liquido do pagamento | CONSBENF.NSN, RELPGT.NSN | Valor final pago ao beneficiario apos descontos. |
+| 52  | VLR-ABONO | Valor de abono | RELPGT.NSN | Valor adicional acumulado separadamente no fechamento do relatorio. |
+| 53  | STATUS-PGTO | Situacao do pagamento | CONSBENF.NSN, RELPGT.NSN | Codigo da etapa do pagamento (ex.: Gerado, Pago, Cancelado, Devolvido, Estornado). |
+| 54  | TIPO-PGTO | Tipo de pagamento | CONSBENF.NSN, RELPGT.NSN | Classifica natureza do pagamento (Normal, Decimo, Terceiro, Outro). |
+| 55  | DT-GERACAO | Data de geracao do pagamento | CONSBENF.NSN, RELPGT.NSN | Marca quando o registro de pagamento foi gerado no processamento. |
+| 56  | DT-CADASTRO | Data de cadastro | CONSBENF.NSN | Data de inclusao do beneficiario no cadastro SIFAP. |
+| 57  | RENDA-FAMILIAR | Renda familiar declarada | CONSBENF.NSN | Campo socioeconomico exibido na tela de consulta do beneficiario. |
+| 58  | NUM-DEPENDENTES | Quantidade de dependentes | CONSBENF.NSN | Indicador familiar usado no perfil cadastral do beneficiario. |
+| 59  | COD-REGIAO | Codigo da regiao administrativa | CONSBENF.NSN | Segmenta o beneficiario por regiao para fins cadastrais/operacionais. |
+| 60  | HISTORICO PAGAMENTOS | Extrato de ultimos pagamentos | CONSBENF.NSN | Lista os ultimos 12 pagamentos do beneficiario com competencia, valores, status e tipo. |
+| 61  | TRILHA AUDITORIA | Log rastreavel de eventos | RELAUDIT.NSN | Relatorio cronologico de eventos de sistema para controle e fiscalizacao. |
+| 62  | ACAO | Tipo de evento auditado | RELAUDIT.NSN | Codigos de negocio de auditoria: IN, AL, CO, CN, DV; EX e filtrado da exibicao. |
+| 63  | CONCILIACAO | Acao de conciliacao | RELAUDIT.NSN | Tipo de evento auditado contado separadamente no resumo de auditoria. |
+| 64  | DIVERGENCIA | Acao de divergencia | RELAUDIT.NSN | Evento de inconsistencia identificado e contabilizado no resumo. |
+| 65  | TABELA-REF | Tabela de referencia do evento | RELAUDIT.NSN | Nome da tabela/entidade afetada pela acao auditada. |
+| 66  | CHAVE-REF | Chave de referencia do evento | RELAUDIT.NSN | Identificador do registro afetado para rastreabilidade na auditoria. |
+| 67  | SUBTOTAL PROGRAMA | Total parcial por programa | RELPGT.NSN | Quebra de controle por COD-PROGRAMA com quantidade e somatorio bruto/liquido. |
 
-> Total: **40 termos** confirmados. Adicione mais conforme novas descobertas.
+> Total: **67 termos** confirmados. Adicione mais conforme novas descobertas.
 
 ## Exemplo de linha bem preenchida
 
