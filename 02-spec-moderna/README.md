@@ -29,11 +29,17 @@
 
 ## Conteúdo
 
-| Arquivo                                    | Propósito                                |
-| ------------------------------------------ | ---------------------------------------- |
-| [`GUIDE.md`](GUIDE.md)                     | Guia passo a passo deste estágio         |
-| [`ADR-TEMPLATE.md`](ADR-TEMPLATE.md)       | Modelo de Registro de Decisão Arquitetural |
-| [`scope-decisions.md`](scope-decisions.md) | Modelo de decisões de escopo           |
+| Arquivo | Propósito |
+|---|---|
+| [`GUIDE.md`](GUIDE.md) | Guia passo a passo deste estágio |
+| [`ADR-TEMPLATE.md`](ADR-TEMPLATE.md) | Modelo de Registro de Decisão Arquitetural |
+| [`scope-decisions.md`](scope-decisions.md) | Decisões de escopo (migrar / descartar / evoluir) |
+| [`bounded-contexts.md`](bounded-contexts.md) | Mapa dos 4 bounded contexts + Avaliação de Hipóteses H1–H7 |
+| [`c4-context.md`](c4-context.md) | C4 L1 (Sistema + atores) · L2 (Modular Monolith) · L3 (Componentes Pagamento) |
+| [`SPECIFICATION.md`](SPECIFICATION.md) | 36 REQs em notação EARS + Critérios de Aceite + Open Questions + Matriz de Rastreabilidade |
+| [`modular-monolith-design.md`](modular-monolith-design.md) | Blueprint de packages, interfaces port, comunicação cross-context, C4 Component |
+| [`openapi.yaml`](openapi.yaml) | OpenAPI 3.1 — 15 endpoints (REST `/api/v1/*`) |
+| [`ADRs/`](ADRs/) | ADR-001 Monolito Modular · ADR-002 Adabas→PostgreSQL · ADR-003 Strangler/SIAFI |
 
 ---
 
