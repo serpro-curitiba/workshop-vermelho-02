@@ -193,6 +193,65 @@ Ordem casada com o plano Strangler ([ADR-003](../02-spec-moderna/ADRs/ADR-003-st
 
 ---
 
+## Handoff H1 — Par 1 → Par 2 (Arquitetura)
+
+**Data:** 27/05/2026  
+**De:** Par 1 — Product Owner + Requirements Engineer  
+**Para:** Par 2 — Enterprise Architect + Software Architect
+
+---
+
+### Top 5 Regras para v1
+
+> **Escopo v1 do Par 1** — estas 5 regras foram priorizadas para a primeira iteração de implementação (cadastro de beneficiários + parametrização). As 5 regras sistêmicas mais críticas do SIFAP como um todo estão em §3.1 deste relatório (BR-001, BR-002, BR-010, BR-012, BR-018) e serão tratadas em iterações subsequentes.
+
+
+| BR-ID | Regra | Risco | Programa Fonte |
+|-------|-------|-------|----------------|
+| BR-003 | Validação CPF por módulo 11 (dígito verificador) | CRÍTICO | CADBENEF.NSN L112 |
+| BR-006 | Vedação de CPF duplicado na inserção | CRÍTICO | CADBENEF.NSN L143 |
+| BR-009 | Beneficiário com idade > 75 anos → status automático "S" | ALTO | CADBENEF.NSN L167 |
+| BR-018 | Fator K = 1 + (fator_reajuste × 0,347215) | CRÍTICO | CADPROG.NSN L87 |
+| BR-019 | VLR-BASE armazenado = VLR-BASE × FATOR-K | CRÍTICO | CADPROG.NSN L88–93 |
+
+---
+
+### Riscos Identificados
+
+1. **Regressão financeira** — BR-018/019 usam multiplicação de ponto flutuante sem precisão definida; reproduzir exatamente o round legado é crítico.
+2. **Integridade cadastral** — BR-003/006 são gates de entrada; falha silenciosa gera dados inválidos em todo o sistema.
+3. **Elegibilidade** — BR-009 sobrescreve status inicial sem log; regra de precedência é implícita no legado.
+4. **Mapeamento PE → relacional** — estrutura de dependentes (CADDEPEND) usa positional occurrence do Adabas; mapear para FK relacional exige decisão de schema.
+5. **Semântica de status** — valores `I/A/S/C/D` não têm enum formalizado; significado inferido por contexto de fluxo.
+
+---
+
+### Conflitos Detectados
+
+| # | Conflito | Localização | Decisão Pendente |
+|---|----------|-------------|-----------------|
+| C-01 | Status pode ser sobrescrito por variável não inicializada no fluxo de alteração | CADBENEF.NSN L209 | Definir valor default seguro ou guard clause |
+| C-02 | Limite de dependentes: L63 usa `> 5` (permite 5), L111 usa `>= 5` (bloqueia no 5º) | CADDEPEND.NSN L63, L111 | Corrigir off-by-one ou preservar comportamento legado documentado |
+| C-03 | VLR-BASE original é sobrescrito pelo valor ajustado (sem campo separado) | CADPROG.NSN L88–93 | Criar campos distintos `vlr_base_original` e `vlr_base_ajustado` |
+
+---
+
+### Decisões Pendentes para Arquitetura
+
+1. **Enum de status** — Modelar `StatusBeneficiario` como enum Java com 5 valores (`I, A, S, C, D`) e semântica documentada.
+2. **Off-by-one dependentes** — Corrigir para consistência (máx 5) ou preservar comportamento documentado? Requer decisão PO.
+3. **Separação de campos VLR-BASE** — Dois campos (`vlr_base_original`, `vlr_base_ajustado`) ou valor único com log de auditoria?
+4. **Precisão decimal** — Usar `BigDecimal` com escala fixa (4 casas) para BR-018/019; registrar como ADR.
+5. **Regra de idade** — Confirmar se > 75 ou ≥ 75; ambiguidade no operador do legado.
+6. **Bounded context** — `cadastro-beneficiario`, `gestao-dependentes` e `calculo-pagamento` são candidatos a módulos separados.
+
+---
+
+### Escopo v1 sugerido
+
+**Inclui:** BR-003, BR-006, BR-009, BR-018, BR-019 + resolução explícita dos 3 conflitos acima.  
+**Backlog:** regras de categoria Média/Baixa (BR-001, BR-002, BR-004, BR-005, BR-007, BR-008, BR-010..BR-017, BR-020).
+
 ### Continuar a leitura
 
 <table width="100%">
