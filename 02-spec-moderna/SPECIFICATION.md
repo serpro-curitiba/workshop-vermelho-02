@@ -42,7 +42,7 @@ O sistema **deverá** armazenar endereço completo do beneficiário com CEP (8 d
 
 ### REQ-BEN-05 [O]
 
-**Onde** o programa social exigir biometria, o sistema **deverá** registrar indicador de biometria (`S`/`N`/`P`), data de coleta, código do posto coletor e hash SHA-256 do template digital.
+**Onde** o programa social exigir biometria, o sistema **deverá** registrar indicador de biometria (`S`/`N`/`P`), data de coleta, código do posto coletor e hash SHA-256 do template digital, e **deverá** bloquear a geração de pagamento enquanto a biometria não estiver regularizada.
 
 - `source_legacy:` [`BENEFICIARIO.ddm`](../01-arqueologia/legado-sifap/adabas-ddms/BENEFICIARIO.ddm) — campos `FA–FD` (adicionados em 2005) + [`PROGRAMA-SOCIAL.ddm`](../01-arqueologia/legado-sifap/adabas-ddms/PROGRAMA-SOCIAL.ddm) campo `CI IND-EXIGE-BIOMETRIA`
 
@@ -64,11 +64,11 @@ O sistema **deverá** permitir até **5 faixas de cálculo** por programa, cada 
 
 ### REQ-CAT-03 [U]
 
-O sistema **deverá** calcular `FATOR-K = 1 + (FATOR-REAJUSTE × 0.347215)` no momento do cadastro/alteração do programa social, e **deverá** persistir `VLR-BASE` já ajustado por `VLR-BASE × FATOR-K`. O fator e a constante mágica `0.347215` ficam isolados em `CatalogoProgramasService.computarFatorK()` e auditados.
+O sistema **deverá** calcular `FATOR-K = 1 + (FATOR-REAJUSTE × 0.347215)` no momento do cadastro/alteração do programa social, e **deverá** persistir `VLR-BASE` já ajustado por `VLR-BASE × FATOR-K`. Na 2.0, esse é o **único** ponto de aplicação do reajuste do programa. O fator e a constante mágica `0.347215` ficam isolados em `CatalogoProgramasService.computarFatorK()` e auditados.
 
 - `source_legacy:` [`CADPROG.NSN`](../01-arqueologia/legado-sifap/natural-programs/CADPROG.NSN) (BR-018, BR-019 em [business-rules-catalog.md](../01-arqueologia/business-rules-catalog.md)) + [`PROGRAMA-SOCIAL.ddm`](../01-arqueologia/legado-sifap/adabas-ddms/PROGRAMA-SOCIAL.ddm) — campo `BG FATOR-K`
 - Decisão arquitetural: [ADR-002 § Decisão item 5](ADRs/ADR-002-mapeamento-adabas-postgresql.md)
-- **Atenção ao Par 3**: BR-022 (`CALCBENF.NSN`) aplica `(1 + FATOR-REAJUSTE)` sobre `VLR-BASE` — que já vem ajustado por BR-019. Há **suspeita de duplo reajuste no legado**. Validar com cálculo paralelo em shadow read antes do flip; não replicar cegamente. Possível ADR-004 para corrigir.
+- **Decisão de clarificação em 27/05/2026**: a 2.0 **não** irá replicar o possível duplo reajuste do legado; o ajuste permanece concentrado em `REQ-CAT-03`.
 
 ### REQ-CAT-04 [C]
 
@@ -102,10 +102,10 @@ O sistema **deverá** calcular `FATOR-K = 1 + (FATOR-REAJUSTE × 0.347215)` no m
 
 O sistema **deverá** calcular o valor bruto do benefício mensal pela fórmula:
 
-$$ \text{VLR\_BENEFICIO} = \text{VLR\_BASE} \times \text{FATOR\_REG} \times \text{FATOR\_FAM} \times \text{FATOR\_RND} \times \text{FATOR\_IDADE} \times (1 + \text{FATOR\_REAJUSTE}) $$
+$$ \text{VLR\_BENEFICIO} = \text{VLR\_BASE} \times \text{FATOR\_REG} \times \text{FATOR\_FAM} \times \text{FATOR\_RND} \times \text{FATOR\_IDADE} $$
 
-- `source_legacy:` [`CALCBENF.NSN`](../01-arqueologia/legado-sifap/natural-programs/CALCBENF.NSN) — linhas 215–222 (`COMPUTE #VLR-BENF = #VLR-BASE * #FATOR-REG * #FATOR-FAM * #FATOR-RND * #FATOR-IDADE` seguido de `* (1 + #FATOR-REAJ)`)
-- Confirmado idêntico em [`BATCHPGT.NSN`](../01-arqueologia/legado-sifap/natural-programs/BATCHPGT.NSN) linhas 268–272
+- `source_legacy:` [`CALCBENF.NSN`](../01-arqueologia/legado-sifap/natural-programs/CALCBENF.NSN) — linhas 215–222 (`COMPUTE #VLR-BENF = #VLR-BASE * #FATOR-REG * #FATOR-FAM * #FATOR-RND * #FATOR-IDADE` seguido no legado por `* (1 + #FATOR-REAJ)`)
+- Divergência intencional da 2.0: o multiplicador adicional `(1 + FATOR-REAJUSTE)` **não** será reaplicado no cálculo mensal porque o reajuste já foi incorporado ao `VLR-BASE` em [REQ-CAT-03](#req-cat-03-u).
 
 ### REQ-PAY-02 [U]
 
@@ -191,9 +191,9 @@ O sistema **deverá** suportar pelo menos os seguintes tipos de desconto cadastr
 
 ### REQ-PAY-11 [C]
 
-**Se** um desconto tiver `DT-FIM-DSCT` preenchida **E** ela for anterior à data de processamento, **então** o sistema **não deverá** aplicar esse desconto no pagamento.
+**Se** um desconto tiver `DT-INICIO-DSCT` posterior à data de processamento **ou** tiver `DT-FIM-DSCT` preenchida e anterior à data de processamento, **então** o sistema **não deverá** aplicar esse desconto no pagamento.
 
-- `source_legacy:` [`CALCDSCT.NSN`](../01-arqueologia/legado-sifap/natural-programs/CALCDSCT.NSN) — linhas 113–119 (validação `IF BENEFICIARIO-V.DT-FIM-DSCT(#IDX) NE 0 AND ... < #DT-HOJE / ESCAPE TOP`)
+- `source_legacy:` [`CALCDSCT.NSN`](../01-arqueologia/legado-sifap/natural-programs/CALCDSCT.NSN) — linhas 113–119 (validação explícita de `DT-FIM-DSCT`); `DT-INICIO-DSCT` é assumida na 2.0 como regra complementar de janela de vigência.
 
 ---
 
@@ -262,7 +262,7 @@ O sistema **deverá** registrar o endereço IP de origem e o identificador de se
 O sistema **deverá** exibir **todas** as ações registradas, incluindo ações `EX` (exclusão), corrigindo o comportamento do `RELAUDIT.NSN` legado que as filtrava.
 
 - `source_legacy:` [`AUDITORIA.ddm`](../01-arqueologia/legado-sifap/adabas-ddms/AUDITORIA.ddm) — `NOTA2` final (`CUIDADO - PROGRAMA RELAUDIT.NSN FILTRA ACOES 'EX' NA EXIBICAO`)
-- Decisão pendente de validação com cliente — ver [ADR-003 § Riscos](ADRs/ADR-003-strangler-coexistencia-siafi.md)
+- **Decisão de clarificação em 27/05/2026**: tratar a omissão de `EX` como bug histórico; a 2.0 exibe `EX` por padrão.
 
 ---
 
@@ -519,8 +519,8 @@ O sistema **deverá** rotear cada bounded context entre legado e 2.0 por feature
 
 | ID | Pergunta | Bloqueia | Quem precisa responder |
 |---|---|---|---|
-| ~~OQ-01~~ | ~~Qual é a fórmula real do `FATOR-K` em PROGRAMA-SOCIAL e quando deve ser aplicado?~~ **RESPONDIDA em 27/05/2026 pela arqueologia de `CADPROG.NSN`**: `FATOR-K = 1 + (FATOR-REAJUSTE × 0.347215)`, aplicado no cadastro do programa para ajustar `VLR-BASE`. Ver BR-018/BR-019. **Nova questão derivada (OQ-01b)**: o legado pode estar aplicando reajuste duas vezes (uma em CADPROG via FATOR-K, outra em CALCBENF via `(1 + FATOR-REAJUSTE)`). Validar com SENARC se isso é intencional. | Estágio 3 (flip de Pagamento) | ~~SENARC~~ → OQ-01b ainda pendente em SENARC |
-| OQ-02 | A não exibição de ações `EX` por `RELAUDIT.NSN` é bug ou requisito? Se requisito, abrir ADR-004 com flag de paridade. | Estágio 3 (auditoria) | Cliente + TCU |
+| ~~OQ-01~~ | ~~Qual é a fórmula real do `FATOR-K` em PROGRAMA-SOCIAL e quando deve ser aplicado?~~ **RESPONDIDA em 27/05/2026 pela arqueologia de `CADPROG.NSN`**: `FATOR-K = 1 + (FATOR-REAJUSTE × 0.347215)`, aplicado no cadastro do programa para ajustar `VLR-BASE`. **Clarificação de 27/05/2026**: a 2.0 **não** reaplica `(1 + FATOR-REAJUSTE)` no cálculo mensal; corrige o possível duplo reajuste do legado. | Fechado | Arquitetura |
+| ~~OQ-02~~ | ~~A não exibição de ações `EX` por `RELAUDIT.NSN` é bug ou requisito?~~ **RESPONDIDA em 27/05/2026**: tratar como bug histórico; a 2.0 deve exibir ações `EX` por padrão. | Fechado | Arquitetura |
 | OQ-03 | Qual a política de purga / arquivamento aceitável para a tabela `pagamento` (180 M+ registros, sem purga desde 1998)? | Estágio 4 (operação) | Compliance + Par 7 (DBA) |
 | OQ-04 | Ações `CO` (consulta) devem voltar a ser gravadas na 2.0 ou manter exclusão desde Port. CGTI 213/2010? | Estágio 3 (auditoria) | CGTI |
 | OQ-05 | Adabas Event Replicator está disponível no ambiente para feed contínuo legado → 2.0? Se não, ETL diário é aceitável? | Estágio 4 (strangler) | Par 9 (DevOps) + Operações Mainframe |

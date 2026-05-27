@@ -1,0 +1,53 @@
+%% C4-L2 Containers - SIFAP 2.0
+
+flowchart TB
+    classDef webapp fill:#1168BD,stroke:#0B4884,color:#FFFFFF
+    classDef module fill:#FFF7E0,stroke:#FFB900,color:#0A0A0A
+    classDef shared fill:#F1F8E3,stroke:#7FBA00,color:#0A0A0A
+    classDef store fill:#438DD5,stroke:#2E6295,color:#FFFFFF
+    classDef external fill:#999999,stroke:#6B6B6B,color:#FFFFFF
+
+    subgraph BROWSER[" "]
+        UI[SIFAP Web<br/>Next.js 15 + TS strict<br/>App Router + Server Actions]:::webapp
+    end
+
+    subgraph BACKEND["SIFAP Backend - Modular Monolith Java 21 / Spring Boot 3.3"]
+        GATE[API Gateway<br/>Spring WebMVC<br/>/api/v1/*]:::webapp
+
+        subgraph MOD["Modulos de dominio"]
+            MB[beneficiario]:::module
+            MC[catalogo]:::module
+            MP[pagamento]:::module
+            MA[auditoria]:::module
+        end
+
+        SK[shared-kernel<br/>tipos cross-cutting,<br/>events bus]:::shared
+        SEC[security<br/>OAuth2/JWT]:::shared
+    end
+
+    DB[(PostgreSQL 16<br/>schema por modulo<br/>+ JSONB p/ MU/PE)]:::store
+    KV[(Azure Key Vault<br/>secrets)]:::store
+
+    SIAFI[SIAFI]:::external
+    BB[Banco / CNAB 240]:::external
+    LEG[(SIFAP Legado)]:::external
+
+    UI -->|HTTPS REST<br/>OpenAPI| GATE
+    GATE --> MB & MC & MP & MA
+    MP -- BeneficiarioQueryPort --> MB
+    MP -- ProgramaCatalogPort --> MC
+    MB & MC & MP -. ApplicationEvents .-> MA
+
+    MB & MC & MP & MA --> SK
+    GATE --> SEC
+
+    MB --> DB
+    MC --> DB
+    MP --> DB
+    MA --> DB
+
+    MP -->|SiafiOrderAdapter| SIAFI
+    MP <-->|CnabAdapter| BB
+    MP -.->|StranglerProxy: rotas residuais| LEG
+
+    SEC --> KV

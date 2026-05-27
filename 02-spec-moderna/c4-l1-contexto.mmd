@@ -1,0 +1,34 @@
+%% C4-L1 Contexto do Sistema - SIFAP 2.0
+
+flowchart TB
+    classDef person fill:#08427B,stroke:#073B6F,color:#FFFFFF
+    classDef system fill:#1168BD,stroke:#0B4884,color:#FFFFFF
+    classDef external fill:#999999,stroke:#6B6B6B,color:#FFFFFF
+    classDef target fill:#F25022,stroke:#A8371A,color:#FFFFFF
+
+    OP[Operador de Cadastro<br/>MDS/MDAS]:::person
+    AUD[Auditor<br/>TCU / CGU]:::person
+    GEST[Gestor de Beneficios<br/>SENARC]:::person
+    BENF[Beneficiario<br/>consulta self-service]:::person
+
+    SIFAP[SIFAP 2.0<br/>Sistema de Fiscalizacao e<br/>Administracao de Pagamentos]:::target
+
+    SIAFI[SIAFI<br/>Ordens bancarias federais]:::external
+    BB[Banco do Brasil + Febraban<br/>CNAB 240]:::external
+    RF[Receita Federal<br/>validacao CPF]:::external
+    IBGE[IBGE<br/>codigos de municipio]:::external
+    BIO[Postos de Coleta<br/>biometria]:::external
+    LEGADO[(SIFAP Legado<br/>Natural/Adabas<br/>1997-presente)]:::external
+
+    OP -->|cadastra / atualiza beneficiarios| SIFAP
+    GEST -->|administra programas e tabelas| SIFAP
+    AUD -->|consulta trilha imutavel| SIFAP
+    BENF -->|consulta pagamento e situacao| SIFAP
+
+    SIFAP -->|envia ordem bancaria| SIAFI
+    SIFAP <-->|remessa SHA-256 / retorno conciliacao| BB
+    SIFAP -.->|valida CPF| RF
+    SIFAP -.->|resolve municipio| IBGE
+    SIFAP -.->|coleta template biometrico| BIO
+
+    SIFAP <-->|migracao incremental<br/>Strangler Fig| LEGADO
