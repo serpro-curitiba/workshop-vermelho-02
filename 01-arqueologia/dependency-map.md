@@ -179,6 +179,131 @@ flowchart LR
 
 - **Nenhum órfão**. Todos os 15 programas são alcançáveis a partir de uma das 4 entradas: Terminal 3270 (CAD*/CONS*), Scheduler noturno (BATCH*), Sub-rotinas (CALC*/VAL* — chamados via `CALLNAT`), Relatórios (REL* — chamados por `BATCHREL`).
 
+## Diagrama ER do Modelo PostgreSQL Inicial
+
+> Derivado dos 4 DDMs Adabas e materializado em `01-arqueologia/legado-sifap/sifap-postgresql-schema.sql`.
+
+```mermaid
+erDiagram
+  PROGRAMA_SOCIAL ||--o{ PROGRAMA_SOCIAL_FAIXA_CALCULO : possui
+  PROGRAMA_SOCIAL ||--o{ PROGRAMA_SOCIAL_PARAMETRO_REGIONAL : possui
+  PROGRAMA_SOCIAL ||--o{ PROGRAMA_SOCIAL_TIPO_DESCONTO : permite
+  PROGRAMA_SOCIAL ||--o{ BENEFICIARIO : programa_atual
+  PROGRAMA_SOCIAL ||--o{ PAGAMENTO : programa_historico
+
+  BENEFICIARIO ||--o{ BENEFICIARIO_DEPENDENTE : possui
+  BENEFICIARIO ||--o{ PAGAMENTO : recebe
+
+  PAGAMENTO ||--o{ PAGAMENTO_DESCONTO : detalha
+
+  AUDITORIA ||--o{ AUDITORIA_VALOR_ANTERIOR : armazena
+  AUDITORIA ||--o{ AUDITORIA_VALOR_POSTERIOR : armazena
+
+  PROGRAMA_SOCIAL {
+    varchar cod_programa PK
+    varchar nome_programa
+    char tipo_programa
+    char sit_programa
+    numeric vlr_base_individual
+    numeric vlr_base_familiar
+    numeric fator_k
+  }
+
+  PROGRAMA_SOCIAL_FAIXA_CALCULO {
+    bigint id_faixa PK
+    varchar cod_programa FK
+    smallint seq_faixa
+    numeric renda_inicio
+    numeric renda_fim
+    numeric fator_multiplicador
+  }
+
+  PROGRAMA_SOCIAL_PARAMETRO_REGIONAL {
+    bigint id_parametro_regional PK
+    varchar cod_programa FK
+    varchar cod_regiao
+    numeric fator_regional
+  }
+
+  PROGRAMA_SOCIAL_TIPO_DESCONTO {
+    bigint id_tipo_desconto PK
+    varchar cod_programa FK
+    smallint seq_tipo
+    varchar tipo_desconto
+  }
+
+  BENEFICIARIO {
+    bigint num_inscricao PK
+    varchar num_cpf UK
+    varchar nome_completo
+    char uf
+    varchar cod_programa FK
+    date dt_cadastro
+    char sit_beneficiario
+    numeric vlr_renda_familiar
+  }
+
+  BENEFICIARIO_DEPENDENTE {
+    bigint id_dependente PK
+    bigint num_inscricao_benef FK
+    smallint seq_dependente
+    varchar nome_dependente
+    date dt_nasc_depend
+    varchar parentesco
+  }
+
+  PAGAMENTO {
+    bigint num_pagamento PK
+    varchar num_cpf
+    bigint num_inscricao FK
+    varchar cod_programa FK
+    numeric ano_mes_ref
+    numeric vlr_bruto
+    numeric vlr_liquido
+    char sit_pagamento
+  }
+
+  PAGAMENTO_DESCONTO {
+    bigint id_desconto PK
+    bigint num_pagamento FK
+    smallint seq_desconto
+    varchar tipo_desconto
+    numeric vlr_desconto
+  }
+
+  AUDITORIA {
+    bigint num_auditoria PK
+    date dt_evento
+    timestamp ts_evento
+    varchar cod_acao
+    varchar tipo_entidade
+    varchar id_entidade
+    varchar usr_evento
+  }
+
+  AUDITORIA_VALOR_ANTERIOR {
+    bigint id_valor_anterior PK
+    bigint num_auditoria FK
+    smallint seq_campo
+    varchar campo_alterado
+    varchar valor_anterior
+  }
+
+  AUDITORIA_VALOR_POSTERIOR {
+    bigint id_valor_posterior PK
+    bigint num_auditoria FK
+    smallint seq_campo
+    varchar campo_alterado
+    varchar valor_posterior
+  }
+```
+
+> Observações:
+>
+> - `beneficiario.cod_programa` representa o vínculo atual do cadastro.
+> - `pagamento.cod_programa` preserva o programa histórico da competência processada.
+> - `auditoria` e tabelas filhas são tratadas como append-only no modelo SQL.
+
 ---
 
 ### Continuar a leitura
