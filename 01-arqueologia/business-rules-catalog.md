@@ -44,23 +44,29 @@ O que NÃO conta: paginação de relatório, formatação de saída, manipulaç�
 
 ## Regras Encontradas
 
-| ID     | Regra de Negócio | Programa Fonte | Campos DDM | Nível de Risco | Notas |
-| ------ | ---------------- | -------------- | ---------- | -------------- | ----- |
-| BR-001 |                  |                |            |                |       |
-| BR-002 |                  |                |            |                |       |
-| BR-003 |                  |                |            |                |       |
-| BR-004 |                  |                |            |                |       |
-| BR-005 |                  |                |            |                |       |
-| BR-006 |                  |                |            |                |       |
-| BR-007 |                  |                |            |                |       |
-| BR-008 |                  |                |            |                |       |
-| BR-009 |                  |                |            |                |       |
-| BR-010 |                  |                |            |                |       |
-| BR-011 |                  |                |            |                |       |
-| BR-012 |                  |                |            |                |       |
-| BR-013 |                  |                |            |                |       |
-| BR-014 |                  |                |            |                |       |
-| BR-015 |                  |                |            |                |       |
+| ID | Regra de Negócio | Programa Fonte | Campos DDM | Nível de Risco | Notas |
+|---|---|---|---|---|---|
+| BR-001 | O cadastro de beneficiário só aceita operações I (inclusão) ou A (alteração). | CADBENEF.NSN | BENEFICIARIO.OPERACAO | ALTO | Regra de entrada do fluxo. |
+| BR-002 | CPF do beneficiário é obrigatório para cadastrar/alterar. | CADBENEF.NSN | BENEFICIARIO.CPF | ALTO | Chave funcional primária no processo. |
+| BR-003 | CPF do beneficiário deve ser válido pelo algoritmo módulo 11. | CADBENEF.NSN | BENEFICIARIO.CPF | CRÍTICO | Falha pode gerar cadastro inválido e pagamento indevido. |
+| BR-004 | Nome do beneficiário é obrigatório. | CADBENEF.NSN | BENEFICIARIO.NOME | MÉDIO | Regra de qualidade de cadastro. |
+| BR-005 | Sexo do beneficiário só aceita M ou F. | CADBENEF.NSN | BENEFICIARIO.SEXO | MÉDIO | Domínio fechado legado. |
+| BR-006 | Inclusão de beneficiário é bloqueada quando CPF já existe. | CADBENEF.NSN | BENEFICIARIO.CPF | CRÍTICO | Evita duplicidade de benefício. |
+| BR-007 | Alteração de beneficiário só ocorre se o CPF já existir. | CADBENEF.NSN | BENEFICIARIO.CPF | ALTO | Evita atualização fantasma. |
+| BR-008 | Na inclusão, beneficiário inicia com status A. | CADBENEF.NSN | BENEFICIARIO.STATUS | ALTO | Regra de estado inicial. |
+| BR-009 | Beneficiário com idade superior a 75 anos recebe status S. | CADBENEF.NSN | BENEFICIARIO.DT-NASCIMENTO, BENEFICIARIO.STATUS | ALTO | Regra especial etária prevalece sobre status inicial. |
+| BR-010 | Não permite incluir dependente para titular com status C ou D. | CADDEPEND.NSN | BENEFICIARIO.STATUS, BENEFICIARIO.CPF | ALTO | Regra de elegibilidade do titular. |
+| BR-011 | Há limite máximo de dependentes por titular. | CADDEPEND.NSN | BENEFICIARIO.NUM-DEPENDENTES, BENEFICIARIO.DEPENDENTES.* | ALTO | Condição atual indica possível off-by-one. |
+| BR-012 | Parentesco de dependente só aceita FI, CO, IR ou OU. | CADDEPEND.NSN | BENEFICIARIO.DEPENDENTES.PARENTESCO | MÉDIO | Domínio fechado de parentesco. |
+| BR-013 | Não permite CPF de dependente duplicado para o mesmo titular. | CADDEPEND.NSN | BENEFICIARIO.CPF, BENEFICIARIO.DEPENDENTES.CPF-DEP | ALTO | Deduplicação é local por titular. |
+| BR-014 | Inclusão de dependente incrementa NUM-DEPENDENTES do titular. | CADDEPEND.NSN | BENEFICIARIO.NUM-DEPENDENTES, BENEFICIARIO.DEPENDENTES.* | ALTO | Impacta regras de elegibilidade e cálculo. |
+| BR-015 | Cadastro de programa social só aceita operações I (inclusão) ou C (consulta). | CADPROG.NSN | PROGRAMA-SOCIAL.OPERACAO | MÉDIO | Regra de fluxo operacional. |
+| BR-016 | Operação C executa consulta somente leitura por código do programa. | CADPROG.NSN | PROGRAMA-SOCIAL.COD-PROGRAMA | BAIXO | Não altera dados. |
+| BR-017 | Inclusão de programa é bloqueada quando código já existe. | CADPROG.NSN | PROGRAMA-SOCIAL.COD-PROGRAMA | ALTO | Garante unicidade de programa. |
+| BR-018 | Fator K é calculado por 1 + (fator reajuste * 0.347215). | CADPROG.NSN | PROGRAMA-SOCIAL.FATOR-REAJUSTE | CRÍTICO | Constante mágica sensível de cálculo financeiro. |
+| BR-019 | Valor armazenado do programa é VLR-BASE multiplicado por FATOR-K. | CADPROG.NSN | PROGRAMA-SOCIAL.VLR-BASE, PROGRAMA-SOCIAL.FATOR-REAJUSTE | CRÍTICO | Campo VLR-BASE passa a carregar valor ajustado. |
+| BR-020 | Programa novo é criado com status ativo A. | CADPROG.NSN | PROGRAMA-SOCIAL.STATUS-PROG | ALTO | Estado inicial afeta uso imediato em elegibilidade. |
+
 
 > Adicione mais linhas conforme necessário. Lembre-se: existem **10 regras escondidas** no código!
 
@@ -74,25 +80,51 @@ O que NÃO conta: paginação de relatório, formatação de saída, manipulaç�
 
 ### Cálculos Financeiros
 
-<!-- Liste aqui as regras relacionadas a cálculos de valores, benefícios, etc. -->
+- **BR-018**: Fator K é calculado por `1 + (fator reajuste * 0.347215)`.
+  Impacto: define a fórmula de reajuste financeiro do programa social.
+- **BR-019**: Valor armazenado do programa é `VLR-BASE * FATOR-K`.
+  Impacto: altera diretamente o valor-base utilizado no sistema.
+- **BR-014**: Inclusão de dependente incrementa `NUM-DEPENDENTES` do titular.
+  Impacto: pode influenciar regras futuras de elegibilidade ou cálculo por composição familiar.
 
 ### Validações de Status
 
-<!-- Liste aqui as regras de transição de status (A, S, C, I, D) -->
+- **BR-008**: Na inclusão, beneficiário inicia com status `A`.
+  Impacto: define o estado inicial do cadastro.
+- **BR-009**: Beneficiário com idade superior a 75 anos recebe status `S`.
+  Impacto: sobrescreve o status inicial por regra etária especial.
+- **BR-010**: Não permite incluir dependente para titular com status `C` ou `D`.
+  Impacto: restringe manutenção cadastral para titulares inelegíveis.
+- **BR-020**: Programa novo é criado com status ativo `A`.
+  Impacto: torna o programa imediatamente utilizável no processo.
 
 ### Regras de Autorização
 
-<!-- Liste aqui as regras de quem pode fazer o quê -->
+- **BR-001**: O cadastro de beneficiário só aceita operações `I` (inclusão) ou `A` (alteração).
+  Impacto: controla quais ações são permitidas na rotina.
+- **BR-007**: Alteração de beneficiário só ocorre se o CPF já existir.
+  Impacto: impede alteração de registro inexistente.
+- **BR-015**: Cadastro de programa social só aceita operações `I` (inclusão) ou `C` (consulta).
+  Impacto: restringe as ações válidas na manutenção de programas.
+- **BR-016**: Operação `C` executa consulta somente leitura por código do programa.
+  Impacto: separa explicitamente leitura de escrita.
+- **BR-017**: Inclusão de programa é bloqueada quando código já existe.
+  Impacto: impede criação duplicada de programa social.
 
 ### Regras de Negócio Temporais
 
-<!-- Liste aqui regras com prazos, datas-limite, períodos -->
+- **BR-009**: Beneficiário com idade superior a 75 anos recebe status `S`.
+  Impacto: regra dependente da idade apurada a partir da data de nascimento.
+- **BR-018**: Fator K é calculado a partir do fator de reajuste vigente no cadastro do programa.
+  Impacto: embute regra de atualização temporal/econômica no valor do programa.
+- **BR-020**: Programa novo é criado com status ativo `A` na data de inclusão.
+  Impacto: caracteriza vigência imediata do programa salvo regra posterior.
 
 ## Resumo Estatístico
 
-- Total de regras encontradas: \_\_\_
-- Regras críticas: \_\_\_
-- Regras com duplicação: \_\_\_
+- Total de regras encontradas: 20
+- Regras críticas: 4
+- Regras com duplicação: 3
 - Regras sem documentação (escondidas): \_\_\_
 
 ---
