@@ -28,108 +28,156 @@
 
 ## Diagrama de Dependências entre Programas
 
-> Substitua o exemplo abaixo pelo mapa real do seu time. **Meta:** cobrir todos os 15 programas, sem órfãos.
+> Mapa real cobrindo os **15 programas** Natural e os **4 DDMs** Adabas.
 
 ```mermaid
 flowchart TD
- subgraph "Programas Online"
- CADBENF["CADBENF.NSN<br/>Cadastro de Beneficiários"]
- CONBENF["CONBENF.NSN<br/>Consulta de Beneficiários"]
- REGPGTO["REGPGTO.NSN<br/>Registro de Pagamentos"]
- end
+  subgraph Online["Programas Online (Terminal 3270)"]
+    CADBENEF["CADBENEF.NSN<br/>Cadastro Beneficiário"]
+    CONSBENF["CONSBENF.NSN<br/>Consulta Beneficiário"]
+    CADDEPEND["CADDEPEND.NSN<br/>Cadastro Dependente"]
+    CADPROG["CADPROG.NSN<br/>Cadastro Programa Social"]
+  end
 
- subgraph "Programas Batch"
- BATCHPGT["BATCHPGT.NSN<br/>Processamento em Lote"]
- end
+  subgraph Batch["Programas Batch (Noturnos)"]
+    BATCHPGT["BATCHPGT.NSN<br/>Ciclo mensal pagamento"]
+    BATCHCON["BATCHCON.NSN<br/>Consultas em lote"]
+    BATCHREL["BATCHREL.NSN<br/>Relatórios em lote"]
+  end
 
- subgraph "Subprogramas"
- CALCBENF["CALCBENF.NSN<br/>Cálculo de Benefícios"]
- VALCPF["VALCPF.NSN<br/>Validação de CPF"]
- end
+  subgraph Reports["Relatórios"]
+    RELPGT["RELPGT.NSN<br/>Relatório de pagamentos"]
+    RELAUDIT["RELAUDIT.NSN<br/>Relatório de auditoria"]
+  end
 
- subgraph "DDMs Adabas"
- DDM_BENEF[("DDM: BENEFICIARIO")]
- DDM_PGTO[("DDM: PAGAMENTO")]
- end
+  subgraph Sub["Subprogramas (CALLNAT)"]
+    CALCBENF["CALCBENF.NSN<br/>Cálculo benefício"]
+    CALCDSCT["CALCDSCT.NSN<br/>Cálculo descontos"]
+    CALCCORR["CALCCORR.NSN<br/>Correção monetária"]
+    VALELEG["VALELEG.NSN<br/>Validação elegibilidade"]
+    VALBENEF["VALBENEF.NSN<br/>Validação cadastro"]
+    VALDOCS["VALDOCS.NSN<br/>Validação documentos"]
+  end
 
- CADBENF -->|CALLNAT| VALCPF
- CADBENF -->|CALLNAT| CALCBENF
- CADBENF -->|READ/STORE| DDM_BENEF
+  subgraph DDMs["DDMs Adabas"]
+    DDM_BENEF[("BENEFICIARIO")]
+    DDM_PGTO[("PAGAMENTO")]
+    DDM_PROG[("PROGRAMA-SOCIAL")]
+    DDM_AUD[("AUDITORIA")]
+  end
 
- REGPGTO -->|CALLNAT| CALCBENF
- REGPGTO -->|READ/STORE| DDM_PGTO
+  CADBENEF -->|CALLNAT| VALBENEF
+  CADBENEF -->|CALLNAT| VALDOCS
+  CADBENEF -->|STORE/UPDATE| DDM_BENEF
+  CADBENEF -.->|log| DDM_AUD
 
- CONBENF -->|READ| DDM_BENEF
+  CADDEPEND -->|UPDATE| DDM_BENEF
+  CADDEPEND -.->|log| DDM_AUD
 
- BATCHPGT -->|CALLNAT| CALCBENF
- BATCHPGT -->|READ/UPDATE| DDM_PGTO
- BATCHPGT -->|READ| DDM_BENEF
+  CADPROG -->|STORE/UPDATE| DDM_PROG
+  CADPROG -.->|log| DDM_AUD
+
+  CONSBENF -->|READ| DDM_BENEF
+  CONSBENF -.->|log CO| DDM_AUD
+
+  BATCHPGT -->|CALLNAT| VALELEG
+  BATCHPGT -->|CALLNAT| CALCBENF
+  BATCHPGT -->|CALLNAT| CALCDSCT
+  BATCHPGT -->|READ ordenado CPF| DDM_BENEF
+  BATCHPGT -->|READ| DDM_PROG
+  BATCHPGT -->|STORE| DDM_PGTO
+  BATCHPGT -.->|log BT| DDM_AUD
+
+  BATCHCON -->|READ| DDM_BENEF
+  BATCHCON -->|READ| DDM_PGTO
+
+  BATCHREL -->|CALLNAT| RELPGT
+  BATCHREL -->|CALLNAT| RELAUDIT
+
+  RELPGT -->|READ| DDM_PGTO
+  RELAUDIT -->|READ filtra EX| DDM_AUD
+
+  CALCBENF -->|READ| DDM_PROG
+  CALCBENF -->|READ| DDM_BENEF
+  CALCDSCT -->|READ| DDM_BENEF
+  CALCCORR -->|READ| DDM_PROG
+  VALELEG -->|READ| DDM_PROG
+  VALELEG -->|READ| DDM_BENEF
 ```
 
-> **Instrução:** este é apenas um exemplo inicial com 6 programas.
-> Seu time deve mapear **todos os 15 programas** e os **4 DDMs**.
+> Linhas pontilhadas = escrita em `AUDITORIA` (cross-cutting, todos os programas online/batch logam).
 
 ## Diagrama de Fluxo de Dados (DDMs)
 
 ```mermaid
 flowchart LR
- subgraph "Entrada de Dados"
- UI["Terminal 3270"]
- BATCH["Arquivos Batch"]
- end
+  subgraph IN["Entrada"]
+    UI["Terminal 3270"]
+    SCHED["Scheduler noturno"]
+    SIAFI_IN["Retorno SIAFI/CNAB 240"]
+  end
 
- subgraph "Processamento"
- PROG["Programas Natural"]
- end
+  subgraph PROC["Programas Natural (15)"]
+    P_ONLINE["Online: CAD*, CONS*"]
+    P_BATCH["Batch: BATCH*"]
+    P_REL["Reports: REL*"]
+  end
 
- subgraph "Armazenamento (Adabas)"
- DDM1[("BENEFICIARIO")]
- DDM2[("PAGAMENTO")]
- DDM3[("DDM 3: ???")]
- DDM4[("DDM 4: ???")]
- end
+  subgraph STORE["Armazenamento Adabas (4 DDMs)"]
+    BENF[("BENEFICIARIO")]
+    PGTO[("PAGAMENTO")]
+    PROG[("PROGRAMA-SOCIAL")]
+    AUD[("AUDITORIA - imutável")]
+  end
 
- UI --> PROG
- BATCH --> PROG
- PROG <--> DDM1
- PROG <--> DDM2
- PROG <--> DDM3
- PROG <--> DDM4
+  subgraph OUT["Saída"]
+    SIAFI_OUT["Remessa SIAFI/CNAB 240"]
+    PDF["Relatórios (impressora 3270)"]
+  end
+
+  UI --> P_ONLINE
+  SCHED --> P_BATCH
+  SIAFI_IN --> P_BATCH
+  P_ONLINE <--> BENF
+  P_ONLINE <--> PROG
+  P_BATCH <--> BENF
+  P_BATCH <--> PROG
+  P_BATCH <--> PGTO
+  P_BATCH --> SIAFI_OUT
+  P_REL --> PDF
+  P_REL --> PGTO
+  P_REL --> AUD
+  P_ONLINE -.-> AUD
+  P_BATCH -.-> AUD
 ```
-
-> Substitua "DDM 3: ???" e "DDM 4: ???" pelos nomes reais encontrados em [`../01-arqueologia/legado-sifap/adabas-ddms/`](../01-arqueologia/legado-sifap/adabas-ddms/).
 
 ## Tabela de Dependências
 
-| Programa     | Chama (CALLNAT) | Lê (READ) DDMs | Escreve (STORE/UPDATE) DDMs | Observações |
-| ------------ | --------------- | -------------- | --------------------------- | ----------- |
-| CADBENF.NSN  |                 |                |                             |             |
-| CONBENF.NSN  |                 |                |                             |             |
-| REGPGTO.NSN  |                 |                |                             |             |
-| BATCHPGT.NSN |                 |                |                             |             |
-| CALCBENF.NSN |                 |                |                             |             |
-| VALCPF.NSN   |                 |                |                             |             |
-|              |                 |                |                             |             |
-|              |                 |                |                             |             |
-|              |                 |                |                             |             |
-|              |                 |                |                             |             |
-|              |                 |                |                             |             |
-|              |                 |                |                             |             |
-|              |                 |                |                             |             |
-|              |                 |                |                             |             |
-|              |                 |                |                             |             |
+| Programa | Chama (CALLNAT) | Lê (READ) DDMs | Escreve (STORE/UPDATE) DDMs | Observações |
+|---|---|---|---|---|
+| CADBENEF.NSN | VALBENEF, VALDOCS | BENEFICIARIO, PROGRAMA-SOCIAL | BENEFICIARIO, AUDITORIA | Ponto de entrada online. |
+| CADDEPEND.NSN | VALDOCS | BENEFICIARIO | BENEFICIARIO (PE GRP-DEPENDENTE), AUDITORIA | Limite 10 dependentes (REQ-BEN-03). |
+| CADPROG.NSN | — | PROGRAMA-SOCIAL | PROGRAMA-SOCIAL, AUDITORIA | Mantém parâmetros (faixas, fatores, FATOR-K). |
+| CONSBENF.NSN | — | BENEFICIARIO, PAGAMENTO | AUDITORIA (CO) | Read-only. Loga consulta. |
+| BATCHPGT.NSN | VALELEG, CALCBENF, CALCDSCT | BENEFICIARIO (ordem CPF), PROGRAMA-SOCIAL | PAGAMENTO, AUDITORIA (BT) | Ciclo mensal. Idempotente por `(CPF,COMPETENCIA)` (BR-012). |
+| BATCHCON.NSN | — | BENEFICIARIO, PAGAMENTO | — | Lê em lote para órgãos de controle (TCU, CGU). |
+| BATCHREL.NSN | RELPGT, RELAUDIT | — | — | Orquestrador noturno de relatórios. |
+| RELPGT.NSN | — | PAGAMENTO | — | Relatório de pagamentos. |
+| RELAUDIT.NSN | — | AUDITORIA | — | **Filtra ações `EX` na exibição** (mistério — OQ-02). |
+| CALCBENF.NSN | CALCCORR | PROGRAMA-SOCIAL, BENEFICIARIO | — | Fórmula central (BR-002). |
+| CALCDSCT.NSN | — | BENEFICIARIO | — | Aplica descontos (BR-009, BR-010, BR-011). |
+| CALCCORR.NSN | — | PROGRAMA-SOCIAL | — | Aplica `FATOR_REAJUSTE`. |
+| VALELEG.NSN | — | PROGRAMA-SOCIAL, BENEFICIARIO | — | Regras por tipo (BR-014, BR-015, BR-016). |
+| VALBENEF.NSN | — | BENEFICIARIO | — | Valida CPF e duplicidade. |
+| VALDOCS.NSN | — | — | — | Valida formato de documentos. |
 
 ## Dependências Circulares
 
-> Liste aqui qualquer dependência circular encontrada (programa A chama B que chama A):
-
-- Nenhuma encontrada até agora.
+- **Nenhuma** dependência circular encontrada. Grafo é acíclico.
 
 ## Programas Órfãos
 
-> Programas que não são chamados por nenhum outro (possíveis pontos de entrada ou código morto):
-
-- A investigar.
+- **Nenhum órfão**. Todos os 15 programas são alcançáveis a partir de uma das 4 entradas: Terminal 3270 (CAD*/CONS*), Scheduler noturno (BATCH*), Sub-rotinas (CALC*/VAL* — chamados via `CALLNAT`), Relatórios (REL* — chamados por `BATCHREL`).
 
 ---
 

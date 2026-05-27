@@ -1,0 +1,555 @@
+openapi: 3.1.0
+info:
+  title: SIFAP 2.0 — API
+  version: 0.1.0
+  description: |
+    API REST do SIFAP 2.0 — Modular Monolith Java 21 / Spring Boot 3.3.
+
+    **Escopo desta versão (esqueleto)**: assinaturas e rotas por bounded context.
+    Schemas detalhados serão completados pelo Par 3 (`@builder-agent`) no Estágio 3.
+
+    Rastreabilidade EARS: cada operação cita os `REQ-*` de [SPECIFICATION.md](SPECIFICATION.md).
+  contact:
+    name: Par 2 — Architecture
+  license:
+    name: Workshop SIFAP 2.0 (interno)
+servers:
+  - url: https://sifap.example.gov.br/api/v1
+    description: Ambiente produtivo (futuro)
+  - url: http://localhost:8080/api/v1
+    description: Local (Docker Compose)
+
+tags:
+  - name: beneficiario
+    description: Cadastro e situação de beneficiários
+  - name: catalogo
+    description: Catálogo de programas sociais e elegibilidade
+  - name: pagamento
+    description: Cálculo, ciclo mensal, conciliação bancária
+  - name: auditoria
+    description: Trilha imutável (somente leitura)
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ============================================================
+  # BENEFICIÁRIO
+  # ============================================================
+  /beneficiarios:
+    post:
+      tags: [beneficiario]
+      summary: Cadastrar novo beneficiário
+      description: "Atende REQ-BEN-01, REQ-BEN-03, REQ-BEN-04."
+      operationId: cadastrarBeneficiario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BeneficiarioCadastroRequest' }
+      responses:
+        '201':
+          description: Criado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficiarioResponse' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409': { description: CPF já cadastrado }
+
+  /beneficiarios/{cpf}:
+    get:
+      tags: [beneficiario]
+      summary: Consultar beneficiário por CPF
+      description: "Atende REQ-BEN-01."
+      operationId: consultarBeneficiario
+      parameters:
+        - $ref: '#/components/parameters/Cpf'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BeneficiarioResponse' }
+        '404': { description: Beneficiário não encontrado }
+
+  /beneficiarios/{cpf}/situacao:
+    patch:
+      tags: [beneficiario]
+      summary: Alterar situação (A/S/C/I/D)
+      description: "Atende REQ-BEN-02."
+      operationId: alterarSituacaoBeneficiario
+      parameters:
+        - $ref: '#/components/parameters/Cpf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AlteracaoSituacaoRequest' }
+      responses:
+        '204': { description: Atualizado }
+        '404': { description: Beneficiário não encontrado }
+
+  /beneficiarios/{cpf}/dependentes:
+    post:
+      tags: [beneficiario]
+      summary: Incluir dependente (limite 10)
+      description: "Atende REQ-BEN-03."
+      operationId: incluirDependente
+      parameters:
+        - $ref: '#/components/parameters/Cpf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DependenteRequest' }
+      responses:
+        '201': { description: Criado }
+        '409': { description: Limite de 10 dependentes atingido }
+
+  /beneficiarios/{cpf}/biometria:
+    post:
+      tags: [beneficiario]
+      summary: Registrar coleta biométrica
+      description: "Atende REQ-BEN-05. Opcional por programa."
+      operationId: registrarBiometria
+      parameters:
+        - $ref: '#/components/parameters/Cpf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BiometriaRequest' }
+      responses:
+        '204': { description: Registrado }
+
+  # ============================================================
+  # CATÁLOGO DE PROGRAMAS
+  # ============================================================
+  /programas:
+    get:
+      tags: [catalogo]
+      summary: Listar programas sociais
+      description: "Atende REQ-CAT-01."
+      operationId: listarProgramas
+      parameters:
+        - in: query
+          name: situacao
+          schema: { type: string, enum: [A, I, E] }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ProgramaResumo' }
+
+  /programas/{codigo}:
+    get:
+      tags: [catalogo]
+      summary: Detalhar programa (com faixas e parâmetros regionais)
+      description: "Atende REQ-CAT-01, REQ-CAT-02."
+      operationId: detalharPrograma
+      parameters:
+        - in: path
+          name: codigo
+          required: true
+          schema: { type: string, minLength: 4, maxLength: 4 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProgramaDetalhe' }
+        '404': { description: Programa não encontrado }
+
+  /programas/{codigo}/elegibilidade/{cpf}:
+    post:
+      tags: [catalogo]
+      summary: Avaliar elegibilidade de um beneficiário para o programa
+      description: "Atende REQ-CAT-04, CAT-05, CAT-06, CAT-07."
+      operationId: avaliarElegibilidade
+      parameters:
+        - in: path
+          name: codigo
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/Cpf'
+      responses:
+        '200':
+          description: Resultado da avaliação
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResultadoElegibilidade' }
+
+  # ============================================================
+  # PAGAMENTO
+  # ============================================================
+  /pagamentos:calcular:
+    post:
+      tags: [pagamento]
+      summary: Calcular e armazenar um pagamento individual
+      description: "Atende REQ-PAY-01..07."
+      operationId: calcularPagamento
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CalculoRequest' }
+      responses:
+        '201':
+          description: Pagamento gerado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagamentoResponse' }
+        '409': { description: "Pagamento já existe para (CPF, competência) — REQ-PAY-12" }
+
+  /pagamentos:ciclo-mensal:
+    post:
+      tags: [pagamento]
+      summary: Disparar ciclo mensal (admin/scheduler)
+      description: "Atende REQ-PAY-12, REQ-PAY-13. Idempotente por competência."
+      operationId: dispararCicloMensal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [competencia]
+              properties:
+                competencia: { type: string, pattern: '^\d{6}$', example: '202605' }
+      responses:
+        '202': { description: Ciclo aceito; processamento assíncrono }
+
+  /pagamentos/{num}:
+    get:
+      tags: [pagamento]
+      summary: Consultar pagamento por número
+      description: "Atende REQ-PAY-16."
+      operationId: consultarPagamento
+      parameters:
+        - in: path
+          name: num
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PagamentoResponse' }
+
+  /pagamentos/{num}:cancelar:
+    post:
+      tags: [pagamento]
+      summary: Cancelar pagamento (válido em P/G)
+      description: "Atende REQ-PAY-16. Pagamentos confirmados (C) requerem fluxo de devolução."
+      operationId: cancelarPagamento
+      parameters:
+        - in: path
+          name: num
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [motivo]
+              properties:
+                motivo: { type: string, maxLength: 3 }
+      responses:
+        '204': { description: Cancelado }
+        '409': { description: Pagamento confirmado — usar fluxo de devolução }
+
+  /conciliacao/cnab:
+    post:
+      tags: [pagamento]
+      summary: Processar arquivo CNAB 240 de retorno do banco
+      description: "Atende REQ-PAY-15. Armazena HASH SHA-256 do arquivo."
+      operationId: processarRetornoCnab
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        '202': { description: Retorno aceito; conciliação assíncrona }
+
+  # ============================================================
+  # AUDITORIA (somente leitura)
+  # ============================================================
+  /auditoria:
+    get:
+      tags: [auditoria]
+      summary: Consultar trilha de auditoria
+      description: "Atende REQ-AUD-01, REQ-AUD-05. Exibe TODAS as ações, incluindo EX."
+      operationId: consultarAuditoria
+      parameters:
+        - in: query
+          name: dtInicio
+          schema: { type: string, format: date }
+        - in: query
+          name: dtFim
+          schema: { type: string, format: date }
+        - in: query
+          name: acao
+          schema: { type: string, enum: [IN, AL, EX, CO, LG, LO, BT, ER, AU, RE] }
+        - in: query
+          name: tipoEntidade
+          schema: { type: string, enum: [BENF, PGTO, PROG, ADMN, SIST] }
+        - in: query
+          name: cpf
+          schema: { type: string, pattern: '^\d{11}$' }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 0, default: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/EventoAuditoriaResumo' }
+                  totalElements: { type: integer }
+                  page: { type: integer }
+                  size: { type: integer }
+
+  /auditoria/{id}:
+    get:
+      tags: [auditoria]
+      summary: Detalhar evento (com estado antes/depois)
+      description: "Atende REQ-AUD-02."
+      operationId: detalharEventoAuditoria
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EventoAuditoriaDetalhe' }
+        '404': { description: Evento não encontrado }
+
+# ============================================================
+# COMPONENTES
+# ============================================================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "OAuth2/JWT com claims de perfil (ADM/OPR/CON/AUD/SUP) — REQ-SYS-02."
+
+  parameters:
+    Cpf:
+      in: path
+      name: cpf
+      required: true
+      schema: { type: string, pattern: '^\d{11}$' }
+      description: CPF do beneficiário (11 dígitos, sem formatação)
+
+  responses:
+    ValidationError:
+      description: Erro de validação
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    # Detalhes a serem completados pelo Par 3 (Estágio 3).
+    # As referências abaixo definem apenas o contrato mínimo (campos-chave).
+
+    BeneficiarioCadastroRequest:
+      type: object
+      required: [cpf, nomeCompleto, dtNascimento, codPrograma, endereco]
+      properties:
+        cpf: { type: string, pattern: '^\d{11}$' }
+        nomeCompleto: { type: string, maxLength: 60 }
+        nomeMae: { type: string, maxLength: 60 }
+        dtNascimento: { type: string, format: date }
+        sexo: { type: string, enum: [M, F, I] }
+        codPrograma: { type: string, minLength: 4, maxLength: 4 }
+        rendaFamiliar: { type: number, format: float, minimum: 0 }
+        qtdMembrosFamilia: { type: integer, minimum: 1 }
+        endereco: { $ref: '#/components/schemas/Endereco' }
+
+    BeneficiarioResponse:
+      type: object
+      properties:
+        cpf: { type: string }
+        nomeCompleto: { type: string }
+        situacao: { type: string, enum: [A, S, C, I, D] }
+        codPrograma: { type: string }
+        dependentes:
+          type: array
+          maxItems: 10
+          items: { $ref: '#/components/schemas/Dependente' }
+
+    Endereco:
+      type: object
+      required: [logradouro, municipio, uf, cep]
+      properties:
+        logradouro: { type: string }
+        numero: { type: string }
+        complemento: { type: string }
+        bairro: { type: string }
+        municipio: { type: string }
+        uf: { type: string, minLength: 2, maxLength: 2 }
+        cep: { type: string, pattern: '^\d{8}$' }
+        codIbge: { type: string }
+        codRegiao: { type: string }
+
+    Dependente:
+      type: object
+      properties:
+        cpf: { type: string }
+        nome: { type: string }
+        dtNascimento: { type: string, format: date }
+        parentesco: { type: string, enum: [FI, CJ, NT, TU] }
+        situacao: { type: string, enum: [A, I, D] }
+        indDeficiencia: { type: boolean }
+
+    AlteracaoSituacaoRequest:
+      type: object
+      required: [novaSituacao, motivo]
+      properties:
+        novaSituacao: { type: string, enum: [A, S, C, I, D] }
+        motivo: { type: string, maxLength: 3 }
+
+    DependenteRequest:
+      $ref: '#/components/schemas/Dependente'
+
+    BiometriaRequest:
+      type: object
+      required: [codPosto, hashTemplate]
+      properties:
+        codPosto: { type: string, maxLength: 6 }
+        hashTemplate: { type: string, pattern: '^[a-f0-9]{64}$' }
+
+    ProgramaResumo:
+      type: object
+      properties:
+        codigo: { type: string }
+        sigla: { type: string }
+        nome: { type: string }
+        tipo: { type: string, enum: [A, T, P] }
+        situacao: { type: string, enum: [A, I, E] }
+
+    ProgramaDetalhe:
+      allOf:
+        - $ref: '#/components/schemas/ProgramaResumo'
+        - type: object
+          properties:
+            vlrBaseIndividual: { type: number }
+            vlrBaseFamiliar: { type: number }
+            vlrTeto: { type: number }
+            vlrPiso: { type: number }
+            pctReajusteAnual: { type: number }
+            rendaMaxPercap: { type: number }
+            idadeMin: { type: integer }
+            idadeMax: { type: integer }
+            exigeBiometria: { type: boolean }
+            faixasRenda:
+              type: array
+              maxItems: 5
+              items:
+                type: object
+                properties:
+                  rendaInicio: { type: number }
+                  rendaFim: { type: number }
+                  fatorMultiplicador: { type: number }
+
+    ResultadoElegibilidade:
+      type: object
+      properties:
+        elegivel: { type: boolean }
+        motivos:
+          type: array
+          items: { type: string }
+
+    CalculoRequest:
+      type: object
+      required: [cpf, competencia]
+      properties:
+        cpf: { type: string, pattern: '^\d{11}$' }
+        competencia: { type: string, pattern: '^\d{6}$' }
+
+    PagamentoResponse:
+      type: object
+      properties:
+        numPagamento: { type: integer, format: int64 }
+        cpf: { type: string }
+        codPrograma: { type: string }
+        competencia: { type: string }
+        vlrBruto: { type: number }
+        vlrDescontoTotal: { type: number }
+        vlrLiquido: { type: number }
+        situacao: { type: string, enum: [P, G, E, C, D, X, R] }
+        descontos:
+          type: array
+          maxItems: 8
+          items:
+            type: object
+            properties:
+              tipo: { type: string, enum: [IR, JD, CS, PA, EM, TX, OU, EX] }
+              valor: { type: number }
+              percentual: { type: number }
+        siafi:
+          type: object
+          properties:
+            numOb: { type: string }
+            numNe: { type: string }
+            situacao: { type: string, enum: [I, P, E] }
+
+    EventoAuditoriaResumo:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        tsEvento: { type: string, format: date-time }
+        acao: { type: string }
+        modulo: { type: string }
+        tipoEntidade: { type: string }
+        idEntidade: { type: string }
+        cpfAfetado: { type: string }
+        usuario: { type: string }
+        ipOrigem: { type: string }
+
+    EventoAuditoriaDetalhe:
+      allOf:
+        - $ref: '#/components/schemas/EventoAuditoriaResumo'
+        - type: object
+          properties:
+            descricao: { type: string }
+            camposAlterados:
+              type: array
+              items:
+                type: object
+                properties:
+                  campo: { type: string }
+                  valorAnterior: { type: string }
+                  valorPosterior: { type: string }
+            correlacaoId: { type: string, format: uuid }
+
+    Problem:
+      type: object
+      description: RFC 7807 Problem Details
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
